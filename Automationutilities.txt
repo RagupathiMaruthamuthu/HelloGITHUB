@@ -1,0 +1,1015 @@
+package com.argo.us.core;
+
+import java.io.File;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.io.FileUtils;
+import org.openqa.selenium.By;
+import org.openqa.selenium.ElementNotVisibleException;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.FluentWait;
+import org.openqa.selenium.support.ui.Wait;
+import org.openqa.selenium.support.ui.WebDriverWait;
+import org.testng.Reporter;
+import com.argo.us.file.Report;
+import com.google.common.base.Function;
+
+public class AutomationUtilities extends AbstractPageObject {
+
+	public static WebDriverWait wait=null;
+	public static Actions action=null;
+	public static boolean screenShotTake = true;
+
+	public AutomationUtilities(WebDriver driver){
+		super(driver);
+	}
+	public AutomationUtilities(){
+
+	}
+
+	public static void selectFromList(List<WebElement> lElement, String sValue)
+			throws Exception {
+		if (!lElement.isEmpty()) {
+			int iSize=lElement.size();
+			for (int i = 0; i < iSize; i++) {
+				isVisible(lElement.get(i), "List");
+				String sText = lElement.get(i).getText();
+				if (sText.equalsIgnoreCase(sValue)) {
+					lElement.get(i).click();
+					Report.log("info", sValue + " is selected");
+					waitforpageload();
+					return;
+				}
+			}
+		}
+		try {
+			throw new ElementNotVisibleException("Element Not Found");
+		} catch (ElementNotVisibleException ex) {
+			Report.log("fail", sValue + " is not present");
+		}
+	}
+
+	public static boolean waitTillClickable(WebElement eElement, int iTimeOut,
+			String sLabel) {
+		wait = new WebDriverWait(driver, iTimeOut);
+		try {
+			wait.until(ExpectedConditions.elementToBeClickable(eElement));
+			return true;
+		} catch (TimeoutException ex) {
+			Report.log("info", sLabel + " is not Clickable");
+			Report.log("screenshot", getScreenshot(sLabel));
+			return false;
+		} catch (Exception ex) {
+			Report.log(
+					"info",
+					"Unknown Error: Element: " + sLabel + " "
+							+ ex.getLocalizedMessage());
+			Report.log("screenshot", getScreenshot(sLabel));
+			return false;
+		}
+	}
+
+	public static boolean isEditable(WebElement element) {
+		try{
+			return (element.getAttribute("readonly") == null) ? element
+					.isEnabled() : false;
+		}
+		catch(Exception e){
+			return false;
+		}
+	}
+
+	public static boolean isVisible(WebElement element, String sLabel) {
+		try {
+			return element.isDisplayed();
+		} catch (Exception ex) {
+			Report.log("info", "Element: " + sLabel + " is not displayed");
+			return false;
+		}
+	}
+
+	public static boolean waitTillVisible(WebElement eElement, int iTimeOut,
+			String sLabel) {
+		wait = new WebDriverWait(driver, iTimeOut);
+		try {
+			wait.until(ExpectedConditions.visibilityOf(eElement));
+			return true;
+		} catch (TimeoutException ex) {
+			Report.log("info", sLabel + " is not Visible");
+			Report.log("screenshot", getScreenshot(sLabel));
+			return false;
+		} catch (Exception ex) {
+			Report.log("info","Unknown Error: Element: " + sLabel + " "
+					+ ex.getLocalizedMessage());
+			Report.log("screenshot", getScreenshot(sLabel));
+			return false;
+		}
+	}
+
+	public static boolean waitTillVisible(List<WebElement> liElement, int iTimeOut,
+			String sLabel) {
+		wait = new WebDriverWait(driver, iTimeOut);
+		try {
+			wait.until(ExpectedConditions.visibilityOf(liElement.get(0)));
+			return true;
+		} catch (TimeoutException ex) {
+			Report.log("info", sLabel + " is not Visible");
+			Report.log("screenshot", getScreenshot(sLabel));
+			return false;
+		} catch (Exception ex) {
+			Report.log("info","Unknown Error: Element: " + sLabel + " "
+					+ ex.getLocalizedMessage());
+			Report.log("screenshot", getScreenshot(sLabel));
+			return false;
+		}
+	}
+
+	public static void isVisibleJavaScript(WebElement eElement, String sLabel) {
+		String js = "arguments[0].style.height='auto'; arguments[0].style.visibility='visible';";
+		((JavascriptExecutor) driver).executeScript(js, eElement);
+		eElement.click();
+	}
+
+	static Function<WebDriver, Boolean> documentWait = new Function<WebDriver, Boolean>() {
+		public Boolean apply(WebDriver driver) {
+			return (Boolean) ((JavascriptExecutor) driver)
+					.executeScript("return document.readyState=='complete'") ? (Boolean) ((JavascriptExecutor) driver)
+							.executeScript("return jQuery.active==0") : false;
+		}
+
+	};
+
+	public static void waitforpageload(int iTimeOut, int iPoolingTime) {
+		String sLabel="";
+		try {
+			sLabel = driver.getTitle();
+			Wait<WebDriver> waitforload = new FluentWait<WebDriver>(driver)
+					.withTimeout(iTimeOut, TimeUnit.SECONDS)
+					.pollingEvery(iPoolingTime, TimeUnit.MILLISECONDS)
+					.ignoring(NoSuchElementException.class);
+
+			waitforload.until(documentWait);
+		} catch (TimeoutException ex) {
+			Report.log("fail", sLabel + " cannot be loaded");
+			Report.log("screenshot", getScreenshot(sLabel));
+		} catch (Exception ex) {
+			/*Report.log(
+					"info",
+					"Unknown Error: Element: " + sLabel + " "
+							+ ex.getLocalizedMessage());*/
+			System.out.println("Unknown Error: Element: " + sLabel + " "
+					+ ex.getLocalizedMessage());
+			System.out.println("Unknown Error: Element: " + sLabel + " "
+					+ ex.getMessage());
+		}
+	}
+
+	public static void waitforpageload() {
+		waitforpageload(DEFAULT_WAIT_4_PAGE, DEFAULT_POOLING_TIME);
+		waitForSpinner();
+		driver.manage().timeouts().pageLoadTimeout(DEFAULT_WAIT_4_PAGE, TimeUnit.SECONDS);
+	}
+
+	public static boolean waitTillTextIsPresent(WebElement eElement,
+			String sTextToBeVisible) {
+		wait = new WebDriverWait(driver, DEFAULT_WAIT_4_ELEMENT);
+		try {
+			wait.until(ExpectedConditions.textToBePresentInElement(eElement,
+					sTextToBeVisible));
+			return true;
+		} catch (Exception ex) {
+			return false;
+		}
+	}
+
+	public static void selectFromList(WebElement eElement,
+			String textToBeSelectedFromList, String sLabel) {
+		drawBorder(eElement);
+		eElement.sendKeys(Keys.chord(Keys.CONTROL, "a"),
+				textToBeSelectedFromList);
+		eElement.sendKeys(Keys.TAB);
+		waitforpageload();
+		Report.log("info", "Entered " + textToBeSelectedFromList
+				+ " in the field " + sLabel);
+	}
+
+	public static void sendKeysToTextField(WebElement eElement, String sText,
+			String sLabel) {
+		waitforpageload();
+		drawBorder(eElement);
+		if (isEditable(eElement)) {
+			buttonClick(eElement, sLabel);
+			//	eElement.sendKeys(Keys.chord(Keys.CONTROL, "a"), sText);
+			eElement.sendKeys(sText);
+			Reporter.log("Enter text:" + sText, true);
+			eElement.sendKeys(Keys.TAB);
+			try{
+				eElement.sendKeys(Keys.ESCAPE);
+			}
+			catch(Exception e){
+
+			}
+			Report.log("info", "Entered " + sText + " in the field " + sLabel);
+		} else {
+			Report.log("fail", "Element: " + sLabel + " is not editable");
+			Report.log("screenshot", getScreenshot(sLabel));
+		}
+	}
+
+	public static void clearAndSendKeysToTextField(WebElement eElement, String sText,
+			String sLabel) {
+		waitforpageload();
+		drawBorder(eElement);
+		if (isEditable(eElement)) {
+			int count = 0;
+			// It will try 4 times to find same element using name.
+			while (count < 4) {
+				try {
+					buttonClick(eElement, sLabel);
+					((JavascriptExecutor) driver).executeScript("arguments[0].setAttribute('value', arguments[1])", eElement, sText);
+					if(!eElement.getAttribute("value").equalsIgnoreCase(sText)){
+						eElement.clear();
+						eElement.click();
+						eElement.sendKeys(sText);
+					}
+					count = count + 4;
+				} catch (StaleElementReferenceException e) {
+					e.toString();
+					System.out.println("Trying to recover from a stale element :" + e.getMessage());
+					wait.until(ExpectedConditions.refreshed(ExpectedConditions.stalenessOf(eElement)));
+					buttonClick(eElement, sLabel);
+					count = count + 1;
+				}
+			}
+			Reporter.log("Enter text:" + sText, true);
+			eElement.sendKeys(Keys.TAB);
+			Report.log("info", "Entered " + sText + " in the field " + sLabel);
+			if (!getAttribute(eElement, "value", sLabel).equalsIgnoreCase(sText))
+				Report.log("info", "Element: " + sLabel + " is not entered with proper value");
+		} else {
+			Report.log("fail", "Element: " + sLabel + " is not editable");
+			Report.log("screenshot", getScreenshot(sLabel));
+		}
+	}
+
+	public static void sendKeysToAutoCompleteField(WebElement eElement, String sText,
+			String sLabel) {
+		drawBorder(eElement);
+		if (isEditable(eElement)) {
+			System.out.println(""+sText);
+			try {
+				eElement.click();
+			}
+			catch(Exception a) {
+
+			}
+			eElement.sendKeys(sText);
+			Reporter.log("Enter text:" + sText, true);
+			try {
+				Thread.sleep(8000);
+			} catch (InterruptedException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			eElement.sendKeys(Keys.ARROW_DOWN);
+
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			eElement.sendKeys(Keys.ENTER);
+			Report.log("info", "Entered " + sText + " in the field " + sLabel);
+		} else {
+			Report.log("fail", "Element: " + sLabel + " is not editable");
+		}
+	}
+
+	public static boolean isSelected(WebElement element) {
+		try {
+			return element.isSelected();
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	public static boolean isEnabled(WebElement element) {
+		try {
+			return element.isEnabled();
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	public static void buttonClick(WebElement eElement, int iTimeOutSeconds,
+			String sLabel) {
+		try{
+			if (waitTillClickable(eElement, iTimeOutSeconds, sLabel)) {
+				drawBorder(eElement);
+				((JavascriptExecutor) driver).executeScript("arguments[0].click()",
+						eElement);
+				Report.log("pass", sLabel + " is clicked");
+				waitforpageload();
+			} else {
+				Report.log("fail", sLabel + " cannot be clicked");
+				Report.log("screenshot", getScreenshot(sLabel));
+			}
+		}
+		catch(Exception e){
+			Report.log("fail", sLabel + " cannot be clicked");
+			Report.log("screenshot", getScreenshot(sLabel));
+		}
+
+	}
+
+	public static void buttonClick(WebElement eElement, String sLabel) {
+		buttonClick(eElement, DEFAULT_WAIT_4_ELEMENT, sLabel);
+	}
+
+	public static void drawBorder(WebElement element) {
+		try {
+			if (driver instanceof JavascriptExecutor) {
+				((JavascriptExecutor) driver).executeScript(
+						"arguments[0].style.border='3.5px solid rgb(0, 230, 0)'",
+						element);
+			}
+		}
+		catch(Exception a) {
+			//Report.log(status, desc);
+		}
+	}
+
+	public static void explicitWait(int iTimeInSec) {
+		try {
+			if (iTimeInSec > 2)
+				waitForSpinner();
+			else
+				Thread.sleep(0);
+		} catch (InterruptedException ex) {
+			Report.log("fail", "Unexpected Error: " + ex.getMessage());
+		}
+	}
+
+	public static void waitForSpinner() {
+		String loadingImage = "//*[contains(text(),'Please Wait') or contains(text(),'Loading')]";
+		try {
+			//Thread.sleep(4000);			
+			if(driver.findElement(By.xpath(loadingImage)).isDisplayed()){
+				WebDriverWait wait = new WebDriverWait(driver, DEFAULT_WAIT_4_PAGE);// from Config
+				wait.until(ExpectedConditions
+						.invisibilityOfElementLocated(By.xpath(loadingImage)));
+			}
+		} catch (Exception e) {
+			System.out.println("Please Wait is not found");
+		}
+
+	}
+
+	public static void sleep(int iTimeOut){
+		try {
+			Thread.sleep(iTimeOut*1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public static boolean data_verfity(String Start_data, String End_data) {
+		String ending = End_data;
+		String[] str = ending.split("/");
+		int year = Integer.parseInt(str[2]);
+		int attach = year - 1;
+		String actual = "";
+		str[2] = String.valueOf(attach);
+		for (String ref : str) {
+			actual = actual + ref + "/";
+		}
+		actual = actual.substring(0, actual.length() - 1);
+		System.out.println(actual);
+		if (Start_data.equalsIgnoreCase(actual)) {
+			return true;
+		} else {
+			return false;
+		}
+
+	}
+
+
+	/*
+	 * Description: Method to split a string into a list based on delimiter
+	 * Input Parameters: String Return : List<String>
+	 */
+	public static List<String> splitByDelimiter(String sToSplit, String sDelimiter) {
+		String[] sArray = sToSplit.split(sDelimiter);
+		return Arrays.asList(sArray);
+	}
+
+	public static List<String> splitByDelimiter(String sToSplit){
+		return splitByDelimiter(sToSplit, ";");
+	}
+
+	/*
+	 * Description: Method to compare contents of two list Input Parameters:
+	 * List<String>, List<String> Return : boolean
+	 */
+	public static boolean compareLists(List<String> compare,
+			List<String> comparewith) {
+		boolean flag = false;
+		if (!(compare == null && comparewith == null)){
+			if (new HashSet<String>(compare).equals(new HashSet<String>(
+					comparewith)))
+				flag = true;
+		}
+		else
+			Report.log("info", "List is Empty");
+		return flag;
+	}
+
+	/*
+	 * Description: Method to extract text from the given list of elements Input
+	 * Parameters: List<? extends WebElements> Return : List of Strings
+	 */
+	public static List<String> readDropDownText(List<WebElement> eElements,
+			String sLabel) {
+		ArrayList<String> aElementValues = new ArrayList<String>();
+		if (eElements.isEmpty()) {
+			for (int i = 0; i < eElements.size(); i++) {
+				aElementValues.add(eElements.get(i).getText());
+			}
+			return aElementValues;
+		}
+		else {
+			Report.log("info", "List is Empty");
+			return null;
+		}
+	}
+
+	public static void contextClick(WebElement eElement, int iWaitTime,
+			String sLabel) {
+		action = new Actions(driver);
+		if (waitTillClickable(eElement, 60, sLabel)) {
+			action.moveToElement(eElement).click().build().perform();
+			Report.log("pass", sLabel + " is clicked");
+			waitforpageload();
+			// AutomationUtilities.explicitWait(iWaitTime);
+		} else {
+			Report.log("fail", sLabel + " cannot be clicked");
+		}
+	}
+
+	public static String getCurrentDateAndTime() {
+		DateFormat dateformat = new SimpleDateFormat("ddMMyyHHmmss");
+		Date date = new Date();
+		return dateformat.format(date);
+	}
+
+	/**
+	 * Author: Shriharsha
+	 * Description: This method will provide the current date as per input format
+	 * @param sFormat
+	 * @return
+	 */
+	public static String getCurrentDateAndTime(String sFormat) {
+		DateFormat dateformat = new SimpleDateFormat(sFormat);
+		Date date = new Date();
+		return dateformat.format(date);
+	}
+
+	public static void hoverElement(WebElement eElement, int iWaitTime,
+			String sLabel) {
+		action = new Actions(driver);
+		if (eElement.isDisplayed()) {
+			action.moveToElement(eElement).perform();
+		} else {
+			Report.log("fail", sLabel + " is not present");
+		}
+	}
+	/*
+	 * Description: Method to check checkbox
+	 * Input Parameters:webElement,timeunits and identifier String Return : void
+	 */
+	public static void checkCheckBox(WebElement eElement, int iTimeOutSeconds,
+			String sLabel) {
+		if (waitTillClickable(eElement, iTimeOutSeconds, sLabel)) {
+			drawBorder(eElement);
+			((JavascriptExecutor) driver).executeScript("arguments[0].click()",
+					eElement);
+			Report.log("pass", sLabel + " is clicked");
+			waitforpageload();
+		} else {
+			Report.log("fail", sLabel + " cannot be clicked");
+		}
+	}
+
+	/*
+	 * Description: Method to fetch text
+	 * Input Parameters:webElement,timeunits and identifier String Return : void
+	 */
+	public static String fetchText(WebElement eElement,
+			String sLabel) {
+		String text="";
+		try {
+			if (eElement.isDisplayed()) {
+				text=eElement.getText();
+			} else {
+				Report.log("fail", sLabel + " is not present");
+			}}
+		catch(Exception a) {
+
+			Report.log("fail", sLabel + " is not present");
+		}
+		return text;
+	}
+
+	/*
+	 * NAME: Write Results in Excel,INPUTS: String,String,String,String , OUTPUTS: NA AUTHOR:Pavan
+	 * DATE: 14/07/2018 NOTES:
+	 */
+	public void enterResultsInExcelSheet(ExcelUtil util,String fileName,String sheetName,String TCID,int column,String result) throws IOException {
+
+		int row=util.getRowNumString(TCID);
+		util.writing(fileName, sheetName, row, column, result);
+	}
+
+	/*
+	 * Description: Method to fetch value of attribute
+	 * Input Parameters:webElement,attribute and element name
+	 */
+	public static String fetchAttribute(WebElement eElement,String attribute,
+			String sLabel) {
+		String text="";
+		try {
+			if (eElement.isDisplayed()) {
+				text=eElement.getAttribute(attribute);
+			} else {
+				Report.log("fail", sLabel + " is not present");
+				Report.log("screenshot", getScreenshot(sLabel));
+			}}
+		catch(Exception a) {			
+			Report.log("fail", sLabel + " is not present");
+			Report.log("screenshot", getScreenshot(sLabel));
+		}
+		return text;
+	}
+	public static void selectFromList(List<WebElement> lElement, String sValue, String sLabel) throws Exception {
+		try {
+			waitforpageload();
+			if (!lElement.isEmpty()) {
+				int iSize=lElement.size();
+				for (int i = 0; i < iSize; i++) {
+					isVisible(lElement.get(i), "List");
+					String sText = lElement.get(i).getText();
+					if (sText.equalsIgnoreCase(sValue)) {
+						lElement.get(i).click();
+						Report.log("pass", "'" + sValue + "' is selected from '" + sLabel +"' dropdown");
+						waitforpageload();
+						return;
+					}
+				}
+			}
+		} catch (ElementNotVisibleException ex) {
+			Report.log("fail", "'" + sValue + "' is not present in '" + sLabel + "' dropdown");
+			Report.log("screenshot", getScreenshot(sLabel));
+		}
+	}
+	/*New added methods*/
+	public static boolean verifyText(WebElement element, String sText, String sLable){
+		boolean result = false;
+		drawBorder(element);
+		System.out.println("text:"+element.getText());
+		if(element.getText().equals(sText)){
+			Report.log("Pass", sText+" is displayed");
+			result = true;
+		}else{
+			Report.log("Fail", sText+" is not displayed. Instead displayed: "+element.getText());
+			Report.log("screenshot", getScreenshot(sLable));
+		}
+		return result;
+	}
+
+	public static boolean verifyTextValue(WebElement element, String sText, String sLable){
+		//drawBorder(element);
+		String sValue = getAttribute(element,"value",sLable).trim();
+		System.out.println("value:"+sValue);
+		if(sValue.contentEquals(sText.trim())){
+			Report.log("Pass" , sText+" is displayed");
+			return true;
+		}else{
+			Report.log("Fail", sText+" is not displayed");
+			Report.log("screenshot", getScreenshot(sLable));
+		}
+		return false;
+	}
+
+	public static void verifyTwoStrings(String sText1, String sText2){
+
+		if(sText1.equalsIgnoreCase(sText2)){
+			Report.log("Pass" , sText1+" is displayed");
+		}else{
+			Report.log("Fail", sText1+" is not displayed");
+			Report.log("screenshot", getScreenshot(sText1));
+		}
+	}
+
+	public static String getAttribute(WebElement element, String sText, String sLable){
+		String sValue;
+		try{
+			drawBorder(element);
+			sValue = element.getAttribute(sText);
+			int l=sValue.length();
+			System.out.println("Element "+element+" contains "+sText+ " as "+sValue);
+		}
+		catch(Exception e){
+			sValue = "";
+		}
+		return sValue;
+	}
+
+	public static void verifyElementIsNotDisplayed(WebElement element, String sElement){
+		if(!isVisible(element, sElement)){
+			Report.log("Pass", sElement+" is not displayed as expected");
+		}else{
+			drawBorder(element);
+			Report.log("Fail", sElement+" is displayed");
+			Report.log("screenshot", getScreenshot(sElement));
+		}
+	}
+
+	public static boolean isElementDisplayed(WebElement element, String sElementName){	
+		try{
+			if(element.isDisplayed()){
+				drawBorder(element);
+				Reporter.log(sElementName+" is displayed", true);
+				return true;
+			}else{
+				Reporter.log(sElementName+" is NOT displayed", true);
+				Report.log("screenshot", getScreenshot(sElementName));
+				return false;
+			}
+		}
+		catch(Exception e){
+			Reporter.log(sElementName+" is NOT displayed", true);
+			Report.log("screenshot", getScreenshot(sElementName));
+			return false;
+		}
+	}
+
+
+	public WebElement prepareDynamicWebElement(String xpath) {
+		WebElement ele = null;
+		try {
+			waitforpageload();
+			WebDriverWait mWait = new WebDriverWait(driver, 60);
+			mWait.until(ExpectedConditions.refreshed(ExpectedConditions.visibilityOfElementLocated(By.xpath(xpath))));
+			ele = driver.findElement(By.xpath(xpath));
+		} catch (Exception e) {
+			System.out.println("Dymamic element not present: " + xpath);
+		}
+		return ele;
+	}
+
+	public static boolean switchToWindow(String sWindowName) {
+		Set<String> sWindowHandles = driver.getWindowHandles();
+		for (String sWindow : sWindowHandles) {
+			if (sWindow.equals(sWindowName)){
+				driver.switchTo().window(sWindow);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static void switchToChildWindow() {
+		try {
+			Thread.sleep(4000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		Set<String>sWindowHandles = driver.getWindowHandles();
+		String cWindow="";
+		Iterator<String> it = sWindowHandles.iterator();
+		while(it.hasNext()) {
+			String pWindow=it.next();
+			cWindow=it.next();
+		}
+
+
+		driver.switchTo().window(cWindow);
+
+	}
+
+	public static void closeChildWindow(){
+		Set<String>sWindowHandles = driver.getWindowHandles();
+		String cWindow="";
+		Iterator<String> it = sWindowHandles.iterator();
+		while(it.hasNext()) {
+			String pWindow=it.next();
+			cWindow=it.next();
+		}
+
+
+		driver.switchTo().window(cWindow).close();
+	}
+
+	public static void verifyAttribute(WebElement element, String attribute, String aData, String sText){
+		drawBorder(element);
+		if(element.getAttribute(attribute).equals(aData)){
+			Report.log("Pass", sText+" is displayed proper value");
+		}else{
+			Report.log("Fail", sText+" is not displayed proper value");
+			Report.log("screenshot", getScreenshot(sText));
+		}
+	}
+
+	public static void verifyElementSize(List<WebElement> element, int eSize, String sElement){
+		if(element.size()==eSize){
+			Report.log("Pass", sElement+" is displayed as expected");
+		}else{
+			Report.log("Fail", sElement+" is not displayed");
+			Report.log("screenshot", getScreenshot(sElement));
+		}
+	}
+
+	public static int getElementSize(List<WebElement> eElement, String sElement){
+		try{
+			waitforpageload();
+			return eElement.size();
+		}
+		catch(Exception e){
+			Report.log("Fail", sElement+" is not displayed");
+			Report.log("screenshot", getScreenshot(sElement));
+		}
+		return 0;
+	}
+
+	/*
+	 * NAME: selectCheckBox 
+	 * DESCRIPTION: This will check if checkbox is selected or not And click if not selected INPUTS: Element, lable OUTPUTS: 
+	 * AUTHOR: Shriharsha 
+	 * DATE: 07/24/2018 
+	 * NOTES:
+	 */
+	public void selectCheckBox(WebElement ele, String sLable) {
+		if (getAttribute(ele, "checked", sLable).length()==0) {
+			buttonClick(ele, sLable);
+		}
+	}
+
+	/*
+	 * NAME: unSelectCheckBox 
+	 * DESCRIPTION: This will check if checkbox is selected or not And unclick if not selected 
+	 * INPUTS: Element, lable 
+	 * OUTPUTS: 
+	 * AUTHOR: Shriharsha 
+	 * DATE: 07/24/2018 
+	 * NOTES:
+	 */
+	public void unSelectCheckBox(WebElement ele, String sLable) {
+		if (getAttribute(ele, "checked", sLable).length()>0) {
+			buttonClick(ele, sLable);
+		}			
+	}
+
+	/*
+	 * NAME: get all Drop down options,
+	 * INPUTS: List<WebElements>
+	 * OUTPUTS: ArrayList<String> 
+	 * AUTHOR:Sudha
+	 * DATE: 24/07/2018
+	 *  NOTES:
+	 */
+
+	public ArrayList<String> getAllDropDownOptions(List<WebElement> listElements)
+	{
+		try
+		{
+			ArrayList<String> listDropDownValues = new ArrayList<String>();
+			listDropDownValues.clear();
+			for(WebElement element : listElements)
+			{
+				listDropDownValues.add(element.getText());			
+			}
+			return listDropDownValues;
+		}
+		catch(Exception e)
+		{
+			System.out.println(e.getStackTrace());
+			Report.log("fail", "Drop Down Values" + " is not present");
+			return null;
+		}
+	}
+
+	public static void clearTextField(WebElement eElement,
+			String sLabel) {
+		drawBorder(eElement);
+		if (isEditable(eElement)) {
+			//	eElement.sendKeys(Keys.chord(Keys.CONTROL, "a"), sText);
+			eElement.clear();
+			Report.log("info", "cleared field " + sLabel);
+		} else {
+			Report.log("fail", "Element: " + sLabel + " is not editable");
+		}
+	}
+
+	public static void sendKeysToAutoCompleteFieldSelectByText(WebElement eElement, String sText,
+			String sLabel) {
+		drawBorder(eElement);
+		if (isEditable(eElement)) {
+			eElement.sendKeys(sText);
+			Reporter.log("Enter text:" + sText, true);
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+			eElement.sendKeys(Keys.ENTER);
+
+			Report.log("info", "Entered " + sText + "and selected in the field " + sLabel);
+		} else {
+			Report.log("fail", "Element: " + sLabel + " is not editable");
+		}
+	}
+
+
+	/**
+	 * @author Shrharsha
+	 * @description This method will take the screenshot
+	 * @param screenshotName
+	 * @return ScreenshotPath
+	 */
+	public static String getScreenshot(String screenshotName) {
+		String destination = "";
+		if (screenShotTake) {
+			// below line is just to append the date format with the screenshot
+			// name
+			// to avoid duplicate names
+			String dateName = new SimpleDateFormat("yyyyMMddhhmmss").format(new Date());
+			TakesScreenshot ts = (TakesScreenshot) driver;
+			File source = ts.getScreenshotAs(OutputType.FILE);
+			// after execution, you could see a folder "FailedTestsScreenshots"
+			// under src folder
+			if (!new File(System.getProperty("user.dir") + "/FailedTestsScreenshots").exists())
+				new File(System.getProperty("user.dir") + "/FailedTestsScreenshots").mkdirs();
+			screenshotName  = screenshotName.replaceAll("[^a-zA-Z0-9]+","");
+			System.out.println(screenshotName);
+			destination = System.getProperty("user.dir") + "/FailedTestsScreenshots/" + screenshotName + dateName
+					+ ".png";
+			File finalDestination = new File(destination);
+			try {
+				FileUtils.copyFile(source, finalDestination);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+
+		// Returns the captured file path
+		return destination;
+	}
+
+	/*
+	 * NAME: checkData 
+	 * DESCRIPTION: This will check data is present in map or not 
+	 * INPUTS: Map, key 
+	 * OUTPUTS: boolean 
+	 * AUTHOR: Shriharsha 
+	 * DATE: 07/24/2018
+	 * NOTES:
+	 */
+	public boolean checkData(Map<String, String> td, String key) {
+		boolean existData = false;
+		try {
+			if (td.containsKey(key)) {
+				if (td.get(key).length() > 0)
+					existData = true;
+			} 
+		}catch (Exception e) {
+			// Error
+		}
+		return existData;
+	}
+
+
+	/*
+	 * NAME: inputTextField 
+	 * DESCRIPTION: This will enter text into a text field
+	 * INPUTS: WebElement, Text, Label 
+	 * OUTPUTS: NA 
+	 * AUTHOR: Pavan 
+	 * DATE: 08/18/2018
+	 * NOTES:
+	 */
+	public static void inputTextField(WebElement eElement, String sText,
+			String sLabel) {
+		waitforpageload();
+		drawBorder(eElement);
+		if (isEditable(eElement)) {
+			buttonClick(eElement, sLabel);
+			//	eElement.sendKeys(Keys.chord(Keys.CONTROL, "a"), sText);
+			eElement.sendKeys(sText);
+			Reporter.log("Enter text:" + sText, true);
+			Report.log("info", "Entered " + sText + " in the field " + sLabel);
+		} else {
+			Report.log("fail", "Element: " + sLabel + " is not editable");
+			Report.log("screenshot", getScreenshot(sLabel));
+		}
+	}
+
+	public void setTextJavaScriptExec(String inputText, WebElement inputElement, String sLabel)
+	{
+		try {
+			JavascriptExecutor js = (JavascriptExecutor) driver;
+			js.executeScript("arguments[0].innerHTML = '" + inputText + "'", inputElement);
+			Report.log("info","Entered Text: "+ inputText + " into "+ sLabel);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	public boolean isNumber(String value){
+		try {
+			int number = Integer.parseInt(value);
+			return true;
+		} catch(NumberFormatException e) {
+			return false;
+		}
+	}
+	/*
+	 * Description: Method to check checkbox
+	 * Input Parameters:webElement,timeunits and identifier String Return : void
+	 */
+	public static void moveToElement(WebElement eElement,
+			String sLabel) {
+
+		drawBorder(eElement);
+		try {
+			Actions act = new Actions(driver);
+			act.moveToElement(eElement);
+			Report.log("PASS", sLabel + " clicked");
+		}
+		catch(Exception a) {
+			Report.log("fail", sLabel + " cannot be clicked");
+			System.out.println(sLabel + " cannot be clicked "+a.getMessage());
+		}
+		waitforpageload();
+	} 
+
+
+	public static void clearDateField(WebElement eElement,String sLabel) {
+		waitforpageload();
+		drawBorder(eElement);
+		
+			try {
+				eElement.sendKeys(Keys.DELETE);
+				
+
+			} catch (StaleElementReferenceException e) {						
+				Report.log("fail", "Element: " + sLabel + " is not editable");
+				Report.log("screenshot", getScreenshot(sLabel));
+			}
+		}
+
+	
+	public static void setValueJavaScriptExec(WebElement eElement, String sText,
+			String sLabel) {
+		waitforpageload();
+		drawBorder(eElement);
+		if (isEditable(eElement)) {
+			try {
+				buttonClick(eElement, sLabel);
+				((JavascriptExecutor) driver).executeScript("arguments[0].setAttribute('value', arguments[1])", eElement, sText);
+
+			} catch (StaleElementReferenceException e) {						
+				Report.log("fail", "Element: " + sLabel + " is not editable");
+				Report.log("screenshot", getScreenshot(sLabel));
+			}
+		}
+
+	}	
+
+}
